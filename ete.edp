@@ -1,0 +1,106 @@
+int n=50;
+
+// paramètres du problème aléatoires
+real temp;
+real fluxp;
+
+ifstream tempx("temperature.txt");
+tempx >> temp; //unité: K, temperature des gens dans la zone centrale
+
+// ifstream flux("coeff.txt");
+// flux >> fluxp; //unité: W/m^2*K, Flux de la porte à l'extérieur
+
+// paramètres du problème fixés
+real a = 0.024; //unité: W/(m*K), coefficient de conductivité thermique air
+real coeffm = 10e4; //adimensionné, ce coefficient va réprésenter le mouvement de l'air à l'intérieur, à cause des courants naturelles et du mouvement des gens en plus.
+real fproj = 40000; //unité: W/m^2, flux des projecteurs
+real puiss = -120000; //unité: W, puissance de la climatisation
+real surface = 4; //unité: m2, surface des ventilateurs
+
+// Définition de la frontière du chapiteau
+border AB(t=0,26){x=t;y=0;};
+border BC(t=0,4.5){x=26;y=t;};
+border CD(t=0,26){x=26-t;y=4.5;};
+border DE(t=0,4.5){x=0;y=4.5-t;};
+
+// Définition des autres éléments
+// Sortie
+border A1(t=0.001,0.10){x=t;y=0.001;};
+border B1(t=0.001,2.5){x=0.10;y=t;};
+border C1(t=0,0.099){x=0.10-t;y=2.5;};
+border D1(t=0,2.499){x=0.001;y=2.5-t;};
+// Projecteurs
+border A2(t=0,0.499){x=25.5+t;y=4;};
+border B2(t=0,0.499){x=25.999;y=4+t;};
+border C2(t=0,0.499){x=25.999-t;y=4.499;};
+border D2(t=0,0.499){x=25.5;y=4.499-t;};
+// Gens
+border A3(t=0.101,22.999){x=t;y=0.001;};
+border B3(t=0.001,1){x=22.999;y=t;};
+border C3(t=0,3.999){x=22.999-t;y=1;};
+border D3(t=0,0.8){x=19;y=1+t;};
+border E3(t=0,12){x=19-t;y=1.8;};
+border F3(t=0,0.8){x=7;y=1.8-t;};
+border G3(t=0,4){x=7-t;y=1;};
+border H3(t=0,0.5){x=3;y=1-t;};
+border I3(t=0,2.899){x=3-t;y=0.5;};
+border J3(t=0,0.499){x=0.101;y=0.5-t;};
+// Ventilation1 (fond)
+border A4(t=0,2){x=20+t;y=4.25;};
+border B4(t=0,0.249){x=22;y=4.25+t;};
+border C4(t=0,2){x=22-t;y=4.499;};
+border D4(t=0,0.249){x=20;y=4.499-t;};
+// Ventilation2 (milieu)
+border A5(t=0,2){x=12+t;y=4.25;};
+border B5(t=0,0.249){x=14;y=4.25+t;};
+border C5(t=0,2){x=14-t;y=4.499;};
+border D5(t=0,0.249){x=12;y=4.499-t;};
+// Ventilation3 (début)
+border A6(t=0,2){x=4+t;y=4.25;};
+border B6(t=0,0.249){x=6;y=4.25+t;};
+border C6(t=0,2){x=6-t;y=4.499;};
+border D6(t=0,0.249){x=4;y=4.499-t;};
+// Scène
+border A7(t=0,2.999){x=25.999-t;y=0.001;};
+border B7(t=0,1.999){x=23;y=0.001+t;};
+border C7(t=0,2.999){x=23+t;y=2;};
+border D7(t=0,1.999){x=25.999;y=2-t;};
+
+
+
+
+// Construction du maillage
+mesh Th = buildmesh(AB(n)+BC(n)+CD(n)+DE(n)+A1(n)+B1(n)+C1(n)+D1(n)+A2(n)+B2(n)+C2(n)+D2(n)+A3(-n)+B3(-n)+C3(-n)+D3(-n)+E3(-n)+F3(-n)+G3(-n)+H3(-n)+I3(-n)+J3(-n)+A4(n)+B4(n)+C4(n)+D4(n)+A5(n)+B5(n)+C5(n)+D5(n)+A6(n)+B6(n)+C6(n)+D6(n)+A7(n)+B7(n)+C7(n)+D7(n));
+
+// Échelle des couleurs
+real[int] colorhsv = [4./6.,1,0.5,4./6.,1,1,5./6.,1,1,1,1.,1,1,0.5,1,0.7,1. ,0.5,1.,1.,1.];
+
+// Définition de l'espace fonctionnel
+fespace Vh(Th,P1);
+
+// Graphique du maillage utilisé
+plot (Th, wait=true);
+
+// Définition des variables de la formulation faible du première problème
+Vh T1,v1;
+
+//Équation du probleme sans ventilation + conditions aux limites
+problem Heat1 (T1,v1) = int2d(Th)((0.024*coeffm)*(dx(T1)*dx(v1)+dy(T1)*dy(v1))) - int1d(Th,A2)(v1*fproj) - int1d(Th,D2)(v1*fproj) - int1d(Th,B1)(v1*fluxp) + on(C3,T1=temp) + on(D3, E3, F3,T1=temp) + on(G3, H3, T1=temp) + on(I3, J3, T1=temp);
+
+// Résolution de l'équation
+Heat1;
+
+// Résultat graphique sur l'écran
+plot (T1, fill=1, value=1, wait=1);
+
+// Définition des variables de la formulation faible du deuxième problème
+Vh T2,v2;
+
+// Équation du problème avec ventilation + conditions aux limites
+problem Heat2 (T2,v2) = int2d(Th)((0.024*coeffm*2)*(dx(T2)*dx(v2)+dy(T2)*dy(v2))) - int1d(Th,A2)(v2*fproj) - int1d(Th,D2)(v2*fproj) - int1d(Th,A4)(v2*0.3*puiss/surface) - int1d(Th,A5)(v2*puiss/surface) - int1d(Th,A6)(v2*0.3*puiss/surface) - int1d(Th,B1)(v2*fluxp) + on(C3,T2=0.97*temp) + on(D3, E3, F3,T2=0.97*temp) + on(G3, H3, T2=0.97*temp) + on(I3, J3, T2=0.97*temp);
+
+// Résolution de l'équation
+Heat2;
+
+// Résultat graphique sur l'écran
+plot (T2, fill=1, value=1, wait=1);
